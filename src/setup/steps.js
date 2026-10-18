@@ -7,7 +7,7 @@ import { setSecret } from '../lib/keychain.js';
 import { runClaude } from '../lib/analyzer.js';
 import { isoLocal } from '../lib/poller.js';
 import * as launchd from '../lib/launchd.js';
-import { loadState, saveState, DEFAULT_SIGNATURE } from '../lib/store.js';
+import { loadState, saveState, withDrafts, DEFAULT_SIGNATURE } from '../lib/store.js';
 import { LEGACY_DIR, LOG_PATH } from '../lib/paths.js';
 import { envProxy } from '../lib/update.js';
 import { c, ok, warn, fail, info, which, expandHome, openUrl, firstUrl, guessDescription, runInherit } from './util.js';
@@ -363,9 +363,9 @@ export async function reply(cfg, ctx) {
 
 export async function selftest(cfg) {
   const data = lark.botDm(cfg.me.open_id, '【boss-at-me 测试】这是草稿通道：以后有人 @你，分析结果和回复草稿会发到这里，你在这里回「发 N / 改 N 内容 / 不发 N」即可。');
-  const st = loadState();
-  st.dmChatId = data?.chat_id || st.dmChatId;
-  saveState(st);
+  withDrafts((d) => {
+    d.dmChatId = data?.chat_id || d.dmChatId;
+  });
   if (await confirm({ message: '飞书里收到机器人发来的【boss-at-me 测试】私聊了吗？', default: true })) {
     ok('草稿通道正常');
   } else {
@@ -390,10 +390,12 @@ export async function service(cfg) {
     }
   }
   launchd.install(cfg);
-  ok(`后台服务已启动，每 ${cfg.reply.intervalSec} 秒检查一次`);
+  ok(`后台服务已启动：每 ${cfg.reply.intervalSec} 秒检查一次新消息；确认指令实时处理`);
   await new Promise((r) => setTimeout(r, 8000));
   const s = launchd.serviceInfo();
-  info(`服务状态：${s.loaded ? `已加载，已运行 ${s.runs} 次，上次退出码 ${s.lastExit ?? '-'}` : '未加载'}`);
+  const l = launchd.serviceInfo('listener');
+  info(`定时服务：${s.loaded ? `已加载，已运行 ${s.runs} 次，上次退出码 ${s.lastExit ?? '-'}` : '未加载'}`);
+  info(`实时确认：${l.pid ? `监听中（pid ${l.pid}）` : '未运行，看日志排查'}`);
   info(`日志：${LOG_PATH}`);
 }
 
@@ -419,16 +421,19 @@ export async function migrate(cfg) {
   if (typeof old.signature === 'string') cfg.reply.signature = old.signature;
   const os = legacy.state;
   const st = loadState();
-  st.dmChatId = os.dm_chat_id || st.dmChatId;
-  st.dmSeen = os.dm_seen || [];
   st.seen = os.seen || {};
   st.lastSearchEnd = os.last_search_end ? new Date(os.last_search_end).toISOString() : null;
-  st.nextCode = os.next_code || 1;
-  st.drafts = Object.fromEntries(Object.entries(os.drafts || {}).map(([code, d]) => [code, {
-    status: d.status, messageId: d.message_id, chatId: d.chat_id, chatName: d.chat_name, sender: d.sender,
-    draft: d.draft, action: d.action, created: new Date(d.created).toISOString(), link: d.link,
-  }]));
   saveState(st);
-  ok(`已导入：监听 ${cfg.watch.length} 人，项目 ${cfg.sources.projects.length} 个，草稿 ${Object.keys(st.drafts).length} 条`);
+  const n = withDrafts((d) => {
+    d.dmChatId = os.dm_chat_id || d.dmChatId;
+    d.dmSeen = os.dm_seen || [];
+    d.nextCode = os.next_code || 1;
+    d.drafts = Object.fromEntries(Object.entries(os.drafts || {}).map(([code, x]) => [code, {
+      status: x.status, messageId: x.message_id, chatId: x.chat_id, chatName: x.chat_name, sender: x.sender,
+      draft: x.draft, action: x.action, created: new Date(x.created).toISOString(), link: x.link,
+    }]));
+    return Object.keys(d.drafts).length;
+  });
+  ok(`已导入：监听 ${cfg.watch.length} 人，项目 ${cfg.sources.projects.length} 个，草稿 ${n} 条`);
   return true;
 }

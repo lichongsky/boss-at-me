@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import * as lark from './lark.js';
 import { analyze } from './analyzer.js';
-import { loadState, saveState, log } from './store.js';
+import { loadState, saveState, loadDrafts, withDrafts, log } from './store.js';
 import { LOCK_PATH } from './paths.js';
 
 // ---------------------------------------------------------------- 时间
@@ -54,54 +54,66 @@ export function resolveCode(st, code) {
   return { err: `有多条待确认草稿（${pending.map((c) => `#${c}`).join('、')}），请带上编号，如「发 ${pending[0]}」` };
 }
 
-function handleConfirmations(cfg, st, { dry }) {
-  if (!st.dmChatId) return;
-  const now = new Date();
-  const msgs = lark.chatMessages({ chatId: st.dmChatId, start: isoLocal(new Date(now - 72 * HOUR)), end: isoLocal(now), pageLimit: 2 });
-  const first = st.dmSeen.length === 0;
+/**
+ * 处理私聊里我发给机器人的一条消息（确认指令）。d 是 drafts.json 的内容，调用方需持有草稿锁。
+ * 轮询和实时监听可能收到同一条消息，靠 dmSeen 去重。
+ */
+export function handleDmMessage(cfg, d, m, { dry = false, seedOnly = false } = {}) {
+  if (d.dmSeen.includes(m.message_id)) return;
+  d.dmSeen.push(m.message_id);
+  d.dmSeen = d.dmSeen.slice(-500);
+  if (seedOnly || m.sender?.id !== cfg.me.open_id || m.msg_type !== 'text') return;
+  const cmd = parseCommand(m.content || '');
+  if (!cmd) return;
   const dm = (text) => (dry ? log('[dry] dm:', text) : lark.botDm(cfg.me.open_id, text));
-  for (const m of msgs) {
-    if (st.dmSeen.includes(m.message_id)) continue;
-    st.dmSeen.push(m.message_id);
-    if (first || m.sender?.id !== cfg.me.open_id || m.msg_type !== 'text') continue;
-    const cmd = parseCommand(m.content || '');
-    if (!cmd) continue;
-    const { code, err } = resolveCode(st, cmd.code);
-    if (err) {
-      dm(`⚠️ ${err}`);
-      continue;
-    }
-    const d = st.drafts[code];
-    if (cmd.kind === 'drop') {
-      d.status = 'dropped';
-      dm(`已忽略 #${code}`);
-      continue;
-    }
-    const final = cmd.kind === 'edit' ? cmd.text : d.draft ? d.draft + (cfg.reply.signature || '') : '';
-    if (!final) {
-      dm(`⚠️ #${code} 没有草稿内容，请用「改 ${code} 你的回复」`);
-      continue;
-    }
-    if (dry) {
-      log('[dry] would reply', d.messageId, clip(final, 80));
-      continue;
-    }
-    try {
-      lark.replyAsMe(d.messageId, final);
-      d.status = 'sent';
-      d.sentText = final;
-      dm(`✅ #${code} 已回复到「${d.chatName}」`);
-      log('sent', code, d.messageId);
-    } catch (e) {
-      d.status = 'manual';
-      const reason = /send_as_user/.test(String(e.message) + JSON.stringify(e.payload || {}))
-        ? '「以本人身份发消息」权限还没生效（可能在等管理员审批）'
-        : clip(e.message, 200);
-      dm(`❌ #${code} 自动发送失败：${reason}\n请复制下面内容手动回复：\n\n${final}\n\n${d.link || ''}`);
-      log('send failed', code, e.message);
-    }
+  const { code, err } = resolveCode(d, cmd.code);
+  if (err) {
+    dm(`⚠️ ${err}`);
+    return;
   }
-  st.dmSeen = st.dmSeen.slice(-500);
+  const draft = d.drafts[code];
+  if (cmd.kind === 'drop') {
+    draft.status = 'dropped';
+    dm(`已忽略 #${code}`);
+    return;
+  }
+  const final = cmd.kind === 'edit' ? cmd.text : draft.draft ? draft.draft + (cfg.reply.signature || '') : '';
+  if (!final) {
+    dm(`⚠️ #${code} 没有草稿内容，请用「改 ${code} 你的回复」`);
+    return;
+  }
+  if (dry) {
+    log('[dry] would reply', draft.messageId, clip(final, 80));
+    return;
+  }
+  try {
+    lark.replyAsMe(draft.messageId, final);
+    draft.status = 'sent';
+    draft.sentText = final;
+    dm(`✅ #${code} 已回复到「${draft.chatName}」`);
+    log('sent', code, draft.messageId);
+  } catch (e) {
+    draft.status = 'manual';
+    const reason = /send_as_user/.test(String(e.message) + JSON.stringify(e.payload || {}))
+      ? '「以本人身份发消息」权限还没生效（可能在等管理员审批）'
+      : clip(e.message, 200);
+    dm(`❌ #${code} 自动发送失败：${reason}\n请复制下面内容手动回复：\n\n${final}\n\n${draft.link || ''}`);
+    log('send failed', code, e.message);
+  }
+}
+
+/** 轮询兜底：实时监听没跑或断线时，靠这里补处理确认指令。 */
+function handleConfirmations(cfg, { dry }) {
+  const { dmChatId } = loadDrafts();
+  if (!dmChatId) return;
+  const now = new Date();
+  const msgs = lark.chatMessages({ chatId: dmChatId, start: isoLocal(new Date(now - 72 * HOUR)), end: isoLocal(now), pageLimit: 2 });
+  const run = (d) => {
+    const seedOnly = d.dmSeen.length === 0; // 第一次只记录历史，不执行旧指令
+    for (const m of msgs) handleDmMessage(cfg, d, m, { dry, seedOnly });
+  };
+  if (dry) run(loadDrafts());
+  else withDrafts(run);
 }
 
 // ---------------------------------------------------------------- 拉取与起草
@@ -110,9 +122,15 @@ const batchText = (job) => job.batch.map((x) => (x.content || '').trim()).join('
 const jobWhere = (job) => (job.kind === 'p2p' ? '私聊你' : '@你');
 const jobChat = (job) => (job.kind === 'p2p' ? `与${job.target.sender?.name}的私聊` : job.target.chat_name);
 
-function notifyDraft(cfg, st, job, res) {
+function notifyDraft(cfg, job, res) {
+  return withDrafts((d) => {
+    const code = String(d.nextCode++);
+    return sendDraftCard(cfg, d, job, res, code);
+  });
+}
+
+function sendDraftCard(cfg, d, job, res, code) {
   const m = job.target;
-  const code = String(st.nextCode++);
   const sender = m.sender?.name;
   const t = (m.create_time || '').slice(5);
   const where = job.kind === 'p2p' ? '' : `${m.chat_name} · `;
@@ -130,8 +148,8 @@ function notifyDraft(cfg, st, job, res) {
   }
   if (m.message_app_link) lines.push(m.message_app_link);
   const data = lark.botDm(cfg.me.open_id, lines.join('\n'));
-  st.dmChatId = st.dmChatId || data?.chat_id || null;
-  st.drafts[code] = {
+  d.dmChatId = d.dmChatId || data?.chat_id || null;
+  d.drafts[code] = {
     status: 'pending', kind: job.kind, messageId: m.message_id, chatId: m.chat_id, chatName: jobChat(job), sender,
     draft, action: res.action, created: new Date().toISOString(), link: m.message_app_link,
   };
@@ -196,7 +214,7 @@ function processJob(cfg, st, job) {
     }
     const res = analyze(cfg, job, ctx);
     log('analyzed', job.kind, m.message_id, res.action, res.confidence, 'cost', res._cost);
-    if (res.action !== 'skip') log(`drafted #${notifyDraft(cfg, st, job, res)}`);
+    if (res.action !== 'skip') log(`drafted #${notifyDraft(cfg, job, res)}`);
   } catch (e) {
     log('analyze failed', m.message_id, e.message);
     try {
@@ -245,12 +263,14 @@ function poll(cfg, st, { dry }) {
 
 function gc(cfg, st) {
   const now = Date.now();
-  for (const d of Object.values(st.drafts)) {
-    if (d.status === 'pending' && now - new Date(d.created) > cfg.tuning.draftTtlHours * HOUR) d.status = 'expired';
-  }
   const week = 7 * 24 * HOUR;
   st.seen = Object.fromEntries(Object.entries(st.seen).filter(([, v]) => now - new Date(v) < week));
-  st.drafts = Object.fromEntries(Object.entries(st.drafts).filter(([, d]) => d.status === 'pending' || now - new Date(d.created) < week));
+  withDrafts((d) => {
+    for (const x of Object.values(d.drafts)) {
+      if (x.status === 'pending' && now - new Date(x.created) > cfg.tuning.draftTtlHours * HOUR) x.status = 'expired';
+    }
+    d.drafts = Object.fromEntries(Object.entries(d.drafts).filter(([, x]) => x.status === 'pending' || now - new Date(x.created) < week));
+  });
 }
 
 // ---------------------------------------------------------------- 一轮
@@ -282,7 +302,7 @@ export function runOnce(cfg, { dry = false } = {}) {
   try {
     const st = loadState();
     try {
-      handleConfirmations(cfg, st, { dry });
+      handleConfirmations(cfg, { dry });
     } catch (e) {
       log('confirmations failed', e.message);
     }

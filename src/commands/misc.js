@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { confirm } from '@inquirer/prompts';
-import { loadConfig, loadState, configExists, log } from '../lib/store.js';
+import { loadConfig, loadState, loadDrafts, configExists, log } from '../lib/store.js';
 import { HOME, LOG_PATH, PLIST_PATH } from '../lib/paths.js';
 import { setLarkBin, authCheck, configShow, whoami } from '../lib/lark.js';
 import { resolveProviderEnv, TOKEN_ACCOUNT } from '../lib/provider.js';
@@ -55,8 +55,10 @@ export function status() {
   console.log(`${c.bold('项目')}      ${cfg.sources.projects.map((p) => p.path).join('\n          ') || '-'}`);
   console.log(`${c.bold('文档')}      ${cfg.sources.docs.map((p) => p.path).join('\n          ') || '-'}${cfg.sources.feishuDocs ? '（+ 飞书文档）' : ''}`);
   console.log(`${c.bold('服务')}      ${svc.loaded ? c.green(`运行中，每 ${cfg.reply.intervalSec}s，已跑 ${svc.runs} 次，上次退出码 ${svc.lastExit}`) : c.yellow('已暂停 / 未安装')}`);
+  const lis = launchd.serviceInfo('listener');
+  console.log(`${c.bold('实时确认')}  ${lis.pid ? c.green(`监听中（pid ${lis.pid}）`) : lis.loaded ? c.yellow('重启中') : c.yellow('未运行，确认指令最多延迟一个检查周期（boss-at-me setup --step service 安装）')}`);
   console.log(`${c.bold('上次检查')}  ${st.lastSearchEnd ? new Date(st.lastSearchEnd).toLocaleString('sv-SE') : '-'}`);
-  const pending = Object.entries(st.drafts).filter(([, d]) => d.status === 'pending');
+  const pending = Object.entries(loadDrafts().drafts).filter(([, d]) => d.status === 'pending');
   console.log(`${c.bold('待确认')}    ${pending.length ? '' : '无'}`);
   for (const [code, d] of pending) console.log(`  #${code} ${d.sender} @你 · ${d.chatName} · ${(d.draft || '（无草稿）').replace(/\s+/g, ' ').slice(0, 40)}`);
 }
@@ -105,6 +107,8 @@ export function doctor() {
   for (const d of [...cfg.sources.projects, ...cfg.sources.docs]) check(fs.existsSync(d.path), `目录：${d.path}`, `目录不存在：${d.path}`);
   const svc = launchd.serviceInfo();
   check(svc.loaded, `后台服务运行中（已跑 ${svc.runs} 次）`, '后台服务未运行（boss-at-me resume 或 setup --step service）');
+  const lis = launchd.serviceInfo('listener');
+  check(lis.pid, `实时确认监听中（pid ${lis.pid}）`, `实时确认未运行${lis.loaded ? `（上次退出码 ${lis.lastExit}，launchd 会自动重启）` : '（boss-at-me setup --step service）'}`);
   for (const legacy of launchd.findLegacyServices()) {
     if (legacy.loaded) warn(`旧版服务 ${legacy.label} 仍在运行，会和新版重复处理（boss-at-me setup --step service 会停掉它）`);
   }

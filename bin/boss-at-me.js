@@ -13,7 +13,8 @@ const HELP = `boss-at-me ${version}
   boss-at-me logs [-f]                  查看日志
   boss-at-me pause | resume             暂停 / 恢复后台服务
   boss-at-me doctor                     诊断常见问题
-  boss-at-me run [--dry-run]            手动跑一轮（后台服务调用的就是它）
+  boss-at-me run [--dry-run]            手动跑一轮（后台定时服务调用的就是它）
+  boss-at-me listen                     实时接收确认指令（后台常驻服务调用的就是它）
   boss-at-me update [--check]           更新到最新版本（--check 只查看不安装）
   boss-at-me uninstall                  卸载
 
@@ -41,6 +42,7 @@ async function main() {
   if (!cmd || cmd === 'help' || cmd === '-h' || cmd === '--help') return console.log(HELP);
   if (cmd === '-v' || cmd === '--version') return console.log(version);
   if (cmd === 'setup') return (await import('../src/commands/setup.js')).default(opts);
+  if (cmd === 'listen') return (await import('../src/commands/listen.js')).listen();
   if (cmd === 'update') return (await import('../src/commands/update.js')).update(opts);
   if (cmd === 'post-update') return (await import('../src/commands/update.js')).postUpdate(opts);
   const misc = await import('../src/commands/misc.js');

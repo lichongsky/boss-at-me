@@ -1,6 +1,6 @@
 {
   "name": "boss-at-me",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "飞书里被领导 @ 时，AI 读代码和聊天记录起草回复，私聊你确认后以你本人身份回复（macOS）",
   "repository": {
     "type": "git",

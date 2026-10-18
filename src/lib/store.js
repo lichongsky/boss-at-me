@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { CONFIG_PATH, STATE_PATH, HOME, LOG_PATH } from './paths.js';
+import { CONFIG_PATH, STATE_PATH, HOME, LOG_PATH, DRAFTS_PATH, DRAFTS_LOCK_PATH } from './paths.js';
 
 export const DEFAULT_SIGNATURE = '\n（AI 助手起草，本人已确认）';
 
@@ -55,7 +55,7 @@ export function saveConfig(cfg) {
 }
 
 export function defaultState() {
-  return { lastSearchEnd: null, seen: {}, drafts: {}, nextCode: 1, dmChatId: null, dmSeen: [] };
+  return { lastSearchEnd: null, seen: {} };
 }
 
 export function loadState() {
@@ -65,6 +65,62 @@ export function loadState() {
 
 export function saveState(st) {
   writeJsonAtomic(STATE_PATH, st);
+}
+
+// ---------------------------------------------------------------- 草稿（跨进程共享）
+
+export function defaultDrafts() {
+  return { drafts: {}, nextCode: 1, dmChatId: null, dmSeen: [] };
+}
+
+export function loadDrafts() {
+  if (fs.existsSync(DRAFTS_PATH)) return { ...defaultDrafts(), ...readJson(DRAFTS_PATH) };
+  // 0.3.x 及以前草稿存在 state.json 里
+  const old = fs.existsSync(STATE_PATH) ? readJson(STATE_PATH) : {};
+  const d = defaultDrafts();
+  for (const k of Object.keys(d)) if (old[k] !== undefined) d[k] = old[k];
+  return d;
+}
+
+export function saveDrafts(d) {
+  writeJsonAtomic(DRAFTS_PATH, d);
+}
+
+function tryLock(p) {
+  try {
+    const fd = fs.openSync(p, 'wx');
+    fs.writeSync(fd, String(process.pid));
+    fs.closeSync(fd);
+    return true;
+  } catch {
+    try {
+      process.kill(Number(fs.readFileSync(p, 'utf8')), 0);
+      return false; // 持有者还活着
+    } catch {
+      fs.rmSync(p, { force: true }); // 持有者已退出，清掉残留锁
+      return tryLock(p);
+    }
+  }
+}
+
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/** 在草稿锁内读-改-写 drafts.json；fn 同步执行，返回值透传。 */
+export function withDrafts(fn, { timeoutMs = 30_000 } = {}) {
+  fs.mkdirSync(path.dirname(DRAFTS_LOCK_PATH), { recursive: true, mode: 0o700 });
+  const deadline = Date.now() + timeoutMs;
+  while (!tryLock(DRAFTS_LOCK_PATH)) {
+    if (Date.now() > deadline) throw new Error('等待草稿锁超时');
+    sleepSync(100);
+  }
+  try {
+    const d = loadDrafts();
+    const r = fn(d);
+    saveDrafts(d);
+    return r;
+  } finally {
+    fs.rmSync(DRAFTS_LOCK_PATH, { force: true });
+  }
 }
 
 export function ensureHome() {
