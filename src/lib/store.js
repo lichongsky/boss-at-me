@@ -15,6 +15,7 @@ export function defaultConfig() {
     reply: { signature: DEFAULT_SIGNATURE, intervalSec: 120, budgetUsd: 2, effort: 'medium' },
     bins: { node: process.execPath, lark: null, claude: null },
     network: { proxy: null }, // 仅用于检查新版本
+    p2p: { enabled: false, quietMin: 5 }, // 是否处理监听人的私聊
     tuning: { firstRunLookbackMin: 10, searchOverlapMin: 15, contextLookbackHours: 36, draftTtlHours: 48 },
   };
 }
@@ -45,6 +46,7 @@ export function loadConfig() {
     reply: { ...base.reply, ...cfg.reply },
     bins: { ...base.bins, ...cfg.bins },
     tuning: { ...base.tuning, ...cfg.tuning },
+    p2p: { ...base.p2p, ...cfg.p2p },
   };
 }
 

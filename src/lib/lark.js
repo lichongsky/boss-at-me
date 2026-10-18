@@ -114,13 +114,17 @@ export function searchUser(query) {
   return r.data?.users || [];
 }
 
+/** 搜索指定人发的消息：atMe 只要 @我 的；chatType 限定 group / p2p。 */
+export function searchMessages({ senders, start, end, atMe = false, chatType }) {
+  const args = ['im', '+messages-search', '--as', 'user', '--sender', senders.join(','),
+    '--start', start, '--end', end, '--page-all', '--no-reactions', '--format', 'json'];
+  if (atMe) args.push('--is-at-me');
+  if (chatType) args.push('--chat-type', chatType);
+  return lark(args, { timeoutMs: 300_000 }).data?.messages || [];
+}
+
 export function searchMentions({ senders, start, end }) {
-  const r = lark(
-    ['im', '+messages-search', '--as', 'user', '--is-at-me', '--sender', senders.join(','),
-      '--start', start, '--end', end, '--page-all', '--no-reactions', '--format', 'json'],
-    { timeoutMs: 300_000 },
-  );
-  return r.data?.messages || [];
+  return searchMessages({ senders, start, end, atMe: true });
 }
 
 export function chatMessages({ chatId, start, end, pageLimit = 4 }) {

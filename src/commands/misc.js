@@ -50,7 +50,7 @@ export function status() {
   const newer = st.latestVersion && compareVersions(st.latestVersion, CURRENT_VERSION) > 0;
   console.log(`${c.bold('版本')}      v${CURRENT_VERSION}${newer ? c.yellow(`（有新版本 v${st.latestVersion}，运行 boss-at-me update）`) : ''}`);
   console.log(`${c.bold('用户')}      ${cfg.me?.name ?? '-'}`);
-  console.log(`${c.bold('监听')}      ${cfg.watch.map((w) => w.name).join('、') || '-'}`);
+  console.log(`${c.bold('监听')}      ${cfg.watch.map((w) => w.name).join('、') || '-'}（群里 @你${cfg.p2p.enabled ? ` + 私聊，等待 ${cfg.p2p.quietMin} 分钟` : ''}）`);
   console.log(`${c.bold('模型')}      ${providerLabel}`);
   console.log(`${c.bold('项目')}      ${cfg.sources.projects.map((p) => p.path).join('\n          ') || '-'}`);
   console.log(`${c.bold('文档')}      ${cfg.sources.docs.map((p) => p.path).join('\n          ') || '-'}${cfg.sources.feishuDocs ? '（+ 飞书文档）' : ''}`);

@@ -164,26 +164,53 @@ async function pickUser(name) {
   return u ? { open_id: u.open_id, name: u.localized_name } : null;
 }
 
-export async function watch(cfg, ctx) {
-  if (cfg.watch.length) {
-    info(`当前监听：${cfg.watch.map((w) => w.name).join('、')}`);
-    if (!(await confirm({ message: '要修改监听名单吗？', default: false }))) return;
-    cfg.watch = [];
+async function addWatch(cfg, name) {
+  const u = await pickUser(name);
+  if (!u) return;
+  if (cfg.watch.some((w) => w.open_id === u.open_id)) info(`${u.name} 已在名单里`);
+  else {
+    cfg.watch.push(u);
+    ok(`已添加：${u.name}`);
   }
-  const queue = [...(ctx.preset?.watch || [])];
+}
+
+export async function watch(cfg, ctx) {
+  if (!cfg.watch.length) {
+    for (const name of ctx.preset?.watch || []) await addWatch(cfg, name);
+  }
   for (;;) {
-    const name = queue.shift()
-      ?? (await input({ message: cfg.watch.length ? '再添加一位（直接回车结束）：' : '要监听谁 @你？输入飞书姓名：' })).trim();
-    if (!name) {
-      if (cfg.watch.length) break;
-      warn('至少添加一位');
-      continue;
+    info(`当前监听：${cfg.watch.length ? cfg.watch.map((w) => w.name).join('、') : '（空）'}`);
+    const choices = [{ name: '添加', value: 'add' }];
+    if (cfg.watch.length) choices.push({ name: '删除', value: 'remove' }, { name: '完成', value: 'done' });
+    const action = await select({ message: '监听名单：', choices, default: cfg.watch.length ? 'done' : 'add' });
+    if (action === 'done') break;
+    if (action === 'add') {
+      const name = (await input({ message: '输入飞书姓名：' })).trim();
+      if (name) await addWatch(cfg, name);
+    } else {
+      const id = await select({
+        message: '删除谁？',
+        choices: [...cfg.watch.map((w) => ({ name: w.name, value: w.open_id })), { name: '取消', value: null }],
+      });
+      if (id) {
+        const w = cfg.watch.find((x) => x.open_id === id);
+        cfg.watch = cfg.watch.filter((x) => x.open_id !== id);
+        ok(`已删除：${w.name}`);
+      }
     }
-    const u = await pickUser(name);
-    if (u && !cfg.watch.some((w) => w.open_id === u.open_id)) {
-      cfg.watch.push(u);
-      ok(`已添加：${u.name}`);
-    }
+  }
+
+  cfg.p2p.enabled = await confirm({
+    message: '他们私聊你的消息也处理吗？（不加的话只处理群里 @你 的）',
+    default: true,
+  });
+  if (cfg.p2p.enabled) {
+    cfg.p2p.quietMin = await number({
+      message: '对方发完消息后等几分钟再分析？（期间对方还在连发会合并处理，你自己回了就跳过）',
+      default: cfg.p2p.quietMin,
+      min: 1,
+      max: 30,
+    });
   }
 }
 

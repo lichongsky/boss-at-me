@@ -18,7 +18,7 @@ const msg = (id, t, name, content) => ({ message_id: id, create_time: t, sender:
 test('prompt 填入身份、时间、前后文和资料清单，无残留占位符', () => {
   const m = msg('m2', '2026-10-18 10:00', '老板', '@小王 接口好了吗');
   const ctx = [msg('m1', '2026-10-18 09:00', '同事', '之前的话'), m, msg('m3', '2026-10-18 10:05', '小王', '我看下')];
-  const p = buildPrompt(cfg, m, ctx, new Date(2026, 9, 18, 21, 0));
+  const p = buildPrompt(cfg, { kind: 'group', target: m, batch: [m] }, ctx, new Date(2026, 9, 18, 21, 0));
   assert.match(p, /你是小王（后端研发）/);
   assert.match(p, /老板 在群「项目群」/);
   assert.match(p, /2026-10-18 21:00（周日）/);
@@ -42,4 +42,16 @@ test('子进程环境去掉父会话的 CLAUDE_CODE_* / ANTHROPIC_*，并补 PAT
   assert.equal(env.CLAUDE_CODE_SESSION_ID, undefined);
   assert.equal(env.ANTHROPIC_BASE_URL, undefined);
   assert.ok(env.PATH.startsWith('/opt/lark/bin:/opt/c/bin:/opt/node/bin'));
+});
+
+test('私聊 prompt：说明连发条数，连发的几条都放进待回复区，不重复出现在前文', () => {
+  const a = msg('p1', '2026-10-18 10:00', '老板', '在吗');
+  const b = msg('p2', '2026-10-18 10:01', '老板', '接口什么时候好');
+  const ctx = [msg('p0', '2026-10-18 09:00', '小王', '早'), a, b];
+  const p = buildPrompt(cfg, { kind: 'p2p', target: b, batch: [a, b] }, ctx);
+  assert.match(p, /老板 私聊了小王（连发 2 条）/);
+  assert.match(p, /## 需要回复的私聊消息\n[\s\S]*在吗[\s\S]*接口什么时候好[\s\S]*## 之前的聊天/);
+  const beforeSection = p.split('## 之前的聊天')[1].split('## 之后的聊天')[0];
+  assert.match(beforeSection, /早/);
+  assert.doesNotMatch(beforeSection, /在吗/);
 });

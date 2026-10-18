@@ -48,18 +48,27 @@ function fmtList(items) {
   return items.length ? items.map((x) => `- ${x.path} ：${x.desc || '（无说明）'}`).join('\n') : '（无）';
 }
 
-export function buildPrompt(cfg, m, ctx, now = new Date()) {
+/** job: { kind: 'group' | 'p2p', target: 要回复的那条消息, batch: 本次要处理的消息（私聊可能连发多条） } */
+export function buildPrompt(cfg, job, ctx, now = new Date()) {
   const tpl = fs.readFileSync(path.join(ROLES_DIR, `${cfg.role || 'backend'}.md`), 'utf8');
-  const others = ctx.filter((x) => x.message_id !== m.message_id);
-  const before = others.filter((x) => x.create_time <= m.create_time).slice(-80);
+  const m = job.target;
+  const me = cfg.me?.name || '我';
+  const sender = m.sender?.name || '对方';
+  const ids = new Set(job.batch.map((x) => x.message_id));
+  const firstTime = job.batch[0].create_time;
+  const others = ctx.filter((x) => !ids.has(x.message_id));
+  const before = others.filter((x) => x.create_time <= firstTime).slice(-80);
   const after = others.filter((x) => x.create_time > m.create_time).slice(0, 20);
+  const p2p = job.kind === 'p2p';
   const vars = {
-    me: cfg.me?.name || '我',
-    sender: m.sender?.name || '对方',
-    chat: m.chat_name || '',
+    me,
+    situation: p2p
+      ? `${sender} 私聊了${me}${job.batch.length > 1 ? `（连发 ${job.batch.length} 条）` : ''}`
+      : `${sender} 在群「${m.chat_name || ''}」里 @了${me}`,
+    targetTitle: p2p ? '需要回复的私聊消息' : '被 @ 的消息',
     chatId: m.chat_id || '',
     now: fmtNow(now),
-    message: fmtMsg(m, 4000),
+    message: job.batch.map((x) => fmtMsg(x, Math.floor(4000 / job.batch.length))).join('\n'),
     before: before.map((x) => fmtMsg(x)).join('\n') || '（无）',
     after: after.map((x) => fmtMsg(x)).join('\n') || '（无）',
     projects: fmtList(cfg.sources.projects),
@@ -126,10 +135,10 @@ export function runClaude(cfg, prompt, { schema = SCHEMA, tools = [], timeoutMs 
   }
 }
 
-export function analyze(cfg, m, ctx) {
+export function analyze(cfg, job, ctx) {
   const dirs = [...cfg.sources.projects, ...cfg.sources.docs].map((x) => x.path).filter((p) => fs.existsSync(p));
   const [cwd, ...rest] = dirs;
-  return runClaude(cfg, buildPrompt(cfg, m, ctx), {
+  return runClaude(cfg, buildPrompt(cfg, job, ctx), {
     tools: allowedTools(cfg),
     cwd,
     addDirs: rest,
