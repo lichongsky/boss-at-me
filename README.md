@@ -1,4 +1,8 @@
-# boss-at-me
+<p align="center"><img src="assets/logo.png" width="200" alt="boss-at-me"></p>
+
+<h1 align="center">boss-at-me</h1>
+
+<p align="center">老板 @ 你，AI 先替你想好怎么回</p>
 
 飞书群里被指定的人（比如你的领导）@ 你，或者私聊你时：
 

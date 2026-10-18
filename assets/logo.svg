@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#6C8CFF"/>
+      <stop offset="0.6" stop-color="#5B4BDB"/>
+      <stop offset="1" stop-color="#2B1F7A"/>
+    </radialGradient>
+    <linearGradient id="helmet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D9E1F2"/>
+    </linearGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1B2550"/>
+      <stop offset="1" stop-color="#0A1030"/>
+    </linearGradient>
+    <linearGradient id="suit" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2A3762"/>
+      <stop offset="1" stop-color="#161E3C"/>
+    </linearGradient>
+    <linearGradient id="tie" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF5A5F"/>
+      <stop offset="1" stop-color="#C81D3A"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0B0830" flood-opacity="0.45"/>
+    </filter>
+    <clipPath id="circle"><circle cx="512" cy="512" r="500"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#circle)">
+    <!-- 背景 -->
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <!-- 速度线 -->
+    <g stroke="#FFFFFF" stroke-linecap="round" opacity="0.13">
+      <line x1="40" y1="300" x2="230" y2="330" stroke-width="10"/>
+      <line x1="20" y1="420" x2="200" y2="430" stroke-width="6"/>
+      <line x1="60" y1="560" x2="220" y2="545" stroke-width="8"/>
+      <line x1="830" y1="640" x2="1000" y2="610" stroke-width="10"/>
+      <line x1="850" y1="520" x2="1010" y2="515" stroke-width="6"/>
+    </g>
+    <!-- 星光 -->
+    <g fill="#FFE27A" filter="url(#glow)">
+      <path d="M840 190 l14 38 38 14 -38 14 -14 38 -14 -38 -38 -14 38 -14z"/>
+      <path d="M905 330 l7 19 19 7 -19 7 -7 19 -7 -19 -19 -7 19 -7z"/>
+      <path d="M150 640 l8 22 22 8 -22 8 -8 22 -8 -22 -22 -8 22 -8z"/>
+    </g>
+
+    <!-- 对话气泡：@ 我 -->
+    <g filter="url(#soft)">
+      <path d="M120 170 h210 a40 40 0 0 1 40 40 v86 a40 40 0 0 1 -40 40 h-120 l-46 42 8 -42 h-52 a40 40 0 0 1 -40 -40 v-86 a40 40 0 0 1 40 -40z" fill="#FFFFFF"/>
+    </g>
+    <text x="225" y="282" text-anchor="middle" font-family="Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="92" font-weight="800" fill="#5B4BDB">@!</text>
+
+    <g transform="translate(46 -24) scale(0.91)">
+    <!-- 身体：西装 -->
+    <g filter="url(#soft)">
+      <path d="M150 1200 L190 1040 C200 820 300 715 512 700 C724 715 824 820 834 1040 L874 1200 Z" fill="url(#suit)"/>
+    </g>
+    <!-- 衬衫 V 领 -->
+    <path d="M440 700 L584 700 L512 850 Z" fill="#F7F9FF"/>
+    <!-- 西装翻领 -->
+    <path d="M440 700 L512 850 L470 905 L372 748 Z" fill="#33437A"/>
+    <path d="M584 700 L512 850 L554 905 L652 748 Z" fill="#33437A"/>
+    <!-- 口袋巾 -->
+    <path d="M662 812 l50 -6 -8 26 -46 4z" fill="#FFD166"/>
+
+    <!-- 脖子 -->
+    <rect x="474" y="630" width="76" height="80" rx="16" fill="#9FB0D3"/>
+    <rect x="474" y="660" width="76" height="10" fill="#7F92BC"/>
+
+    <!-- 双手抱胸：后面那只手臂 -->
+    <g transform="rotate(-7 512 860)" filter="url(#soft)">
+      <rect x="270" y="812" width="470" height="96" rx="48" fill="#24305A" stroke="#0E1430" stroke-width="6"/>
+      <rect x="690" y="812" width="22" height="96" fill="#F7F9FF"/>
+      <ellipse cx="742" cy="860" rx="44" ry="42" fill="#E6ECF8" stroke="#0E1430" stroke-width="5"/>
+      <path d="M760 830 q24 30 0 60" stroke="#B9C6E2" stroke-width="6" fill="none"/>
+    </g>
+    <!-- 前面那只手臂 -->
+    <g transform="rotate(7 512 900)" filter="url(#soft)">
+      <rect x="284" y="852" width="470" height="100" rx="50" fill="#3A4C88" stroke="#0E1430" stroke-width="6"/>
+      <rect x="312" y="852" width="22" height="100" fill="#F7F9FF"/>
+      <ellipse cx="282" cy="902" rx="44" ry="44" fill="#E6ECF8" stroke="#0E1430" stroke-width="5"/>
+      <path d="M262 872 q-24 30 0 60" stroke="#B9C6E2" stroke-width="6" fill="none"/>
+      <!-- 袖子褶皱 -->
+      <path d="M560 870 q40 18 80 0" stroke="#3E4F8A" stroke-width="6" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- 领带：迎风飘起 -->
+    <g filter="url(#soft)">
+      <path d="M496 706 L528 706 L536 732 L488 732 Z" fill="#B0173A"/>
+      <path d="M492 730 C520 752 556 760 610 748 C668 735 712 700 770 690 C800 686 830 692 850 700 L812 728 L846 744 C800 760 760 790 700 812 C640 834 572 828 528 790 C510 774 498 754 492 730 Z" fill="url(#tie)"/>
+      <path d="M540 768 C600 790 680 770 760 736" stroke="#FF8A8F" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.8"/>
+    </g>
+
+    <!-- 头 -->
+    <g filter="url(#soft)">
+      <!-- 天线 -->
+      <line x1="512" y1="300" x2="512" y2="210" stroke="#C9D3EA" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="512" cy="196" r="26" fill="#FFD166" filter="url(#glow)"/>
+      <!-- 耳机 -->
+      <rect x="296" y="420" width="62" height="130" rx="30" fill="#8FA3CF"/>
+      <rect x="666" y="420" width="62" height="130" rx="30" fill="#8FA3CF"/>
+      <!-- 头盔 -->
+      <rect x="330" y="288" width="364" height="362" rx="130" fill="url(#helmet)"/>
+      <!-- 面罩 -->
+      <rect x="370" y="370" width="284" height="196" rx="86" fill="url(#visor)"/>
+      <path d="M402 392 q40 -16 90 -10" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.35"/>
+    </g>
+    <!-- 眉毛：自信、随时待命 -->
+    <g stroke="#5CF2FF" stroke-width="12" stroke-linecap="round" filter="url(#glow)">
+      <line x1="418" y1="428" x2="478" y2="440"/>
+      <line x1="606" y1="428" x2="546" y2="440"/>
+    </g>
+    <!-- 眼睛 -->
+    <g filter="url(#glow)">
+      <ellipse cx="452" cy="476" rx="26" ry="32" fill="#5CF2FF"/>
+      <ellipse cx="572" cy="476" rx="26" ry="32" fill="#5CF2FF"/>
+    </g>
+    <circle cx="460" cy="464" r="9" fill="#FFFFFF"/>
+    <circle cx="580" cy="464" r="9" fill="#FFFFFF"/>
+    <!-- 嘴：微微一笑 -->
+    <path d="M488 528 q30 20 58 -2" stroke="#5CF2FF" stroke-width="9" stroke-linecap="round" fill="none" filter="url(#glow)"/>
+    <!-- 腮红 -->
+    <ellipse cx="398" cy="538" rx="24" ry="12" fill="#FF8FB1" opacity="0.55"/>
+    <ellipse cx="626" cy="538" rx="24" ry="12" fill="#FF8FB1" opacity="0.55"/>
+    <!-- 耳麦话筒：随时回答 -->
+    <path d="M708 520 C712 590 660 610 606 600" stroke="#5E6F99" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <rect x="582" y="586" width="34" height="26" rx="13" fill="#3A4670"/>
+    <circle cx="724" cy="470" r="10" fill="#5CF2FF" filter="url(#glow)"/>
+    </g>
+  </g>
+
+  <!-- 外圈 -->
+  <circle cx="512" cy="512" r="500" fill="none" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="8"/>
+</svg>
