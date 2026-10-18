@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import * as lark from './lark.js';
 import { analyze } from './analyzer.js';
+import { buildDraftCard, buildDoneCard } from './card.js';
 import { loadState, saveState, loadDrafts, withDrafts, log } from './store.js';
 import { LOCK_PATH } from './paths.js';
 
@@ -54,30 +55,32 @@ export function resolveCode(st, code) {
   return { err: `有多条待确认草稿（${pending.map((c) => `#${c}`).join('、')}），请带上编号，如「发 ${pending[0]}」` };
 }
 
+const SEND_AS_USER_HINT = '「以本人身份发消息」权限还没生效（可能在等管理员审批）';
+
+/** 把草稿卡片更新为最终状态（尽力而为，失败不影响结果）。 */
+function refreshCard(draft, code, note) {
+  if (!draft.cardMessageId) return;
+  try {
+    lark.updateCard(draft.cardMessageId, buildDoneCard({ ...draft.card, code, status: draft.status, finalText: draft.sentText, note }));
+  } catch (e) {
+    log('update card failed', code, e.message);
+  }
+}
+
 /**
- * 处理私聊里我发给机器人的一条消息（确认指令）。d 是 drafts.json 的内容，调用方需持有草稿锁。
- * 轮询和实时监听可能收到同一条消息，靠 dmSeen 去重。
+ * 执行一条草稿的处理决定。kind: send（按草稿原样，加署名）/ edit（发 text，不加署名）/ drop。
+ * 调用方需持有草稿锁。文字指令和卡片按钮共用。
  */
-export function handleDmMessage(cfg, d, m, { dry = false, seedOnly = false } = {}) {
-  if (d.dmSeen.includes(m.message_id)) return;
-  d.dmSeen.push(m.message_id);
-  d.dmSeen = d.dmSeen.slice(-500);
-  if (seedOnly || m.sender?.id !== cfg.me.open_id || m.msg_type !== 'text') return;
-  const cmd = parseCommand(m.content || '');
-  if (!cmd) return;
-  const dm = (text) => (dry ? log('[dry] dm:', text) : lark.botDm(cfg.me.open_id, text));
-  const { code, err } = resolveCode(d, cmd.code);
-  if (err) {
-    dm(`⚠️ ${err}`);
-    return;
-  }
+export function executeDraft(cfg, d, code, { kind, text }, { dry = false, ackText = true } = {}) {
+  const dm = (msg) => (dry ? log('[dry] dm:', msg) : lark.botDm(cfg.me.open_id, msg));
   const draft = d.drafts[code];
-  if (cmd.kind === 'drop') {
+  if (kind === 'drop') {
     draft.status = 'dropped';
-    dm(`已忽略 #${code}`);
+    if (!dry) refreshCard(draft, code);
+    if (ackText && !draft.cardMessageId) dm(`已忽略 #${code}`);
     return;
   }
-  const final = cmd.kind === 'edit' ? cmd.text : draft.draft ? draft.draft + (cfg.reply.signature || '') : '';
+  const final = kind === 'edit' ? text : draft.draft ? draft.draft + (cfg.reply.signature || '') : '';
   if (!final) {
     dm(`⚠️ #${code} 没有草稿内容，请用「改 ${code} 你的回复」`);
     return;
@@ -90,16 +93,67 @@ export function handleDmMessage(cfg, d, m, { dry = false, seedOnly = false } = {
     lark.replyAsMe(draft.messageId, final);
     draft.status = 'sent';
     draft.sentText = final;
-    dm(`✅ #${code} 已回复到「${draft.chatName}」`);
     log('sent', code, draft.messageId);
+    refreshCard(draft, code);
+    if (ackText && !draft.cardMessageId) dm(`✅ #${code} 已回复到「${draft.chatName}」`);
   } catch (e) {
     draft.status = 'manual';
-    const reason = /send_as_user/.test(String(e.message) + JSON.stringify(e.payload || {}))
-      ? '「以本人身份发消息」权限还没生效（可能在等管理员审批）'
-      : clip(e.message, 200);
-    dm(`❌ #${code} 自动发送失败：${reason}\n请复制下面内容手动回复：\n\n${final}\n\n${draft.link || ''}`);
+    draft.sentText = final;
+    const reason = /send_as_user/.test(String(e.message) + JSON.stringify(e.payload || {})) ? SEND_AS_USER_HINT : clip(e.message, 200);
     log('send failed', code, e.message);
+    refreshCard(draft, code, reason);
+    if (!draft.cardMessageId) dm(`❌ #${code} 自动发送失败：${reason}\n请复制下面内容手动回复：\n\n${final}\n\n${draft.link || ''}`);
   }
+}
+
+/**
+ * 处理私聊里我发给机器人的一条消息（文字指令）。d 是 drafts.json 的内容，调用方需持有草稿锁。
+ * 轮询和实时监听可能收到同一条消息，靠 dmSeen 去重。
+ */
+export function handleDmMessage(cfg, d, m, { dry = false, seedOnly = false } = {}) {
+  if (d.dmSeen.includes(m.message_id)) return;
+  d.dmSeen.push(m.message_id);
+  d.dmSeen = d.dmSeen.slice(-500);
+  if (seedOnly || m.sender?.id !== cfg.me.open_id || m.msg_type !== 'text') return;
+  const cmd = parseCommand(m.content || '');
+  if (!cmd) return;
+  const { code, err } = resolveCode(d, cmd.code);
+  if (err) {
+    if (dry) log('[dry] dm:', err);
+    else lark.botDm(cfg.me.open_id, `⚠️ ${err}`);
+    return;
+  }
+  // 卡片会变成最终状态，文字指令再补一句回执，方便在私聊流里确认
+  executeDraft(cfg, d, code, cmd, { dry, ackText: true });
+  const draft = d.drafts[code];
+  if (!dry && draft.cardMessageId && draft.status !== 'pending') {
+    lark.botDm(cfg.me.open_id, draft.status === 'sent' ? `✅ #${code} 已回复到「${draft.chatName}」` : draft.status === 'dropped' ? `已忽略 #${code}` : `❌ #${code} 发送失败，见卡片`);
+  }
+}
+
+/** 处理卡片按钮回调（card.action.trigger）。调用方需持有草稿锁。 */
+export function handleCardAction(cfg, d, ev) {
+  if (ev.operator_id !== cfg.me.open_id) return;
+  const code = Object.keys(d.drafts).find((c) => d.drafts[c].cardMessageId === ev.message_id);
+  if (!code) return;
+  const draft = d.drafts[code];
+  if (draft.status !== 'pending') {
+    refreshCard(draft, code); // 重复点击：把卡片刷成最终状态即可
+    return;
+  }
+  if (ev.action_name === 'drop') {
+    executeDraft(cfg, d, code, { kind: 'drop' });
+    return;
+  }
+  if (ev.action_name !== 'send') return;
+  let text = '';
+  try {
+    text = String(JSON.parse(ev.form_value || '{}').reply || '').trim();
+  } catch {
+    // 没有表单值：按原草稿发送
+  }
+  const kind = !text || text === draft.draft ? 'send' : 'edit';
+  executeDraft(cfg, d, code, { kind, text });
 }
 
 /** 轮询兜底：实时监听没跑或断线时，靠这里补处理确认指令。 */
@@ -122,7 +176,7 @@ const batchText = (job) => job.batch.map((x) => (x.content || '').trim()).join('
 const jobWhere = (job) => (job.kind === 'p2p' ? '私聊你' : '@你');
 const jobChat = (job) => (job.kind === 'p2p' ? `与${job.target.sender?.name}的私聊` : job.target.chat_name);
 
-function notifyDraft(cfg, job, res) {
+export function notifyDraft(cfg, job, res) {
   return withDrafts((d) => {
     const code = String(d.nextCode++);
     return sendDraftCard(cfg, d, job, res, code);
@@ -133,27 +187,45 @@ function sendDraftCard(cfg, d, job, res, code) {
   const m = job.target;
   const sender = m.sender?.name;
   const t = (m.create_time || '').slice(5);
-  const where = job.kind === 'p2p' ? '' : `${m.chat_name} · `;
-  const head = res.action === 'reply'
-    ? `【#${code} ${sender} ${jobWhere(job)}】${where}${t}`
-    : `【#${code} 需你处理 · ${sender} ${jobWhere(job)}】${where}${t}`;
   const draft = (res.draft || '').trim();
-  const lines = [head, '', `原文：${clip(batchText(job), 300)}`, '',
-    `要点：${res.summary}`,
-    `依据：${clip(res.analysis, 600)}（把握：${res.confidence}）`];
-  if (draft) {
-    lines.push('', '✏️ 草稿：', draft, '', '———', `回「发 ${code}」原样发送 ·「改 ${code} 你的内容」改后发送 ·「不发 ${code}」忽略`);
-  } else {
-    lines.push('', '———', `无草稿。可回「改 ${code} 你的内容」直接回复，或「不发 ${code}」`);
-  }
-  if (m.message_app_link) lines.push(m.message_app_link);
-  const data = lark.botDm(cfg.me.open_id, lines.join('\n'));
-  d.dmChatId = d.dmChatId || data?.chat_id || null;
-  d.drafts[code] = {
+  const card = {
+    sender, where: jobWhere(job), chatName: job.kind === 'p2p' ? '' : m.chat_name, time: t, action: res.action,
+    original: clip(batchText(job), 600), summary: res.summary, analysis: clip(res.analysis, 1500), confidence: res.confidence,
+    link: m.message_app_link,
+  };
+  const entry = {
     status: 'pending', kind: job.kind, messageId: m.message_id, chatId: m.chat_id, chatName: jobChat(job), sender,
     draft, action: res.action, created: new Date().toISOString(), link: m.message_app_link,
   };
+  let data = null;
+  if (cfg.reply.cards !== false) {
+    try {
+      data = lark.botCard(cfg.me.open_id, buildDraftCard({ ...card, code, draft }));
+      Object.assign(entry, { cardMessageId: data?.message_id, card });
+    } catch (e) {
+      log('send card failed, fallback to text', e.message);
+    }
+  }
+  if (!data) data = lark.botDm(cfg.me.open_id, draftText(code, job, res, draft));
+  d.dmChatId = d.dmChatId || data?.chat_id || null;
+  d.drafts[code] = entry;
   return code;
+}
+
+/** 文字版草稿通知（卡片不可用时） */
+function draftText(code, job, res, draft) {
+  const m = job.target;
+  const where = job.kind === 'p2p' ? '' : `${m.chat_name} · `;
+  const t = (m.create_time || '').slice(5);
+  const head = res.action === 'reply'
+    ? `【#${code} ${m.sender?.name} ${jobWhere(job)}】${where}${t}`
+    : `【#${code} 需你处理 · ${m.sender?.name} ${jobWhere(job)}】${where}${t}`;
+  const lines = [head, '', `原文：${clip(batchText(job), 300)}`, '', `要点：${res.summary}`,
+    `依据：${clip(res.analysis, 600)}（把握：${res.confidence}）`];
+  if (draft) lines.push('', '✏️ 草稿：', draft, '', '———', `回「发 ${code}」原样发送 ·「改 ${code} 你的内容」改后发送 ·「不发 ${code}」忽略`);
+  else lines.push('', '———', `无草稿。可回「改 ${code} 你的内容」直接回复，或「不发 ${code}」`);
+  if (m.message_app_link) lines.push(m.message_app_link);
+  return lines.join('\n');
 }
 
 /**
@@ -267,7 +339,10 @@ function gc(cfg, st) {
   st.seen = Object.fromEntries(Object.entries(st.seen).filter(([, v]) => now - new Date(v) < week));
   withDrafts((d) => {
     for (const x of Object.values(d.drafts)) {
-      if (x.status === 'pending' && now - new Date(x.created) > cfg.tuning.draftTtlHours * HOUR) x.status = 'expired';
+      if (x.status === 'pending' && now - new Date(x.created) > cfg.tuning.draftTtlHours * HOUR) {
+        x.status = 'expired';
+        refreshCard(x, Object.keys(d.drafts).find((c) => d.drafts[c] === x));
+      }
     }
     d.drafts = Object.fromEntries(Object.entries(d.drafts).filter(([, x]) => x.status === 'pending' || now - new Date(x.created) < week));
   });

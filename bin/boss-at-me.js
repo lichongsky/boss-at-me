@@ -18,7 +18,7 @@ const HELP = `boss-at-me ${version}
   boss-at-me update [--check]           更新到最新版本（--check 只查看不安装）
   boss-at-me uninstall                  卸载
 
-setup 步骤：preflight lark-app lark-auth watch provider sources reply selftest service
+setup 步骤：preflight lark-app lark-auth watch provider sources reply selftest cards service
 `;
 
 function parseArgs(argv) {

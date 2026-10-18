@@ -52,3 +52,25 @@ test('handleDmMessage：忽略别人发的和非文本消息', () => {
   handleDmMessage(cfg, d, { message_id: 'b', sender: { id: 'ou_me' }, msg_type: 'image', content: '不发 1' }, { dry: true });
   assert.equal(d.drafts[1].status, 'pending');
 });
+
+const { buildDraftCard, buildDoneCard } = await import('../src/lib/card.js');
+
+test('草稿卡片：Card 2.0，表单里有可编辑草稿和发送/不发按钮；完成卡片去掉表单', () => {
+  const p = { code: '7', sender: '老板', where: '@你', chatName: '项目群', time: '10-18 10:00', action: 'notify',
+    original: '原文', summary: '要点', analysis: '依据', confidence: 'high', draft: '好的', link: 'https://x' };
+  const card = buildDraftCard(p);
+  assert.equal(card.schema, '2.0');
+  const form = card.body.elements.find((e) => e.tag === 'form');
+  assert.equal(form.elements[0].default_value, '好的');
+  const names = JSON.stringify(form).match(/"name":"(send|drop)"/g);
+  assert.deepEqual(names, ['"name":"send"', '"name":"drop"']);
+  assert.equal(card.header.template, 'orange');
+  const done = buildDoneCard({ ...p, status: 'sent', finalText: '好的' });
+  assert.ok(!JSON.stringify(done).includes('"tag":"form"'));
+  assert.equal(done.header.template, 'green');
+});
+
+test('草稿超过输入框上限时只读展示，改用文字指令', () => {
+  const card = buildDraftCard({ code: '8', sender: 'a', where: '@你', summary: 's', analysis: 'a', confidence: 'low', original: 'o', draft: 'x'.repeat(1200) });
+  assert.ok(!JSON.stringify(card).includes('"tag":"form"'));
+});

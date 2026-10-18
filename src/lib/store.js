@@ -12,7 +12,7 @@ export function defaultConfig() {
     watch: [], // [{ open_id, name }]
     provider: null, // 见 provider.js
     sources: { projects: [], docs: [], feishuDocs: false }, // projects/docs: [{ path, desc }]
-    reply: { signature: DEFAULT_SIGNATURE, intervalSec: 120, budgetUsd: 2, effort: 'medium' },
+    reply: { signature: DEFAULT_SIGNATURE, intervalSec: 120, budgetUsd: 2, effort: 'medium', cards: false },
     bins: { node: process.execPath, lark: null, claude: null },
     network: { proxy: null }, // 仅用于检查新版本
     p2p: { enabled: false, quietMin: 5 }, // 是否处理监听人的私聊

@@ -380,6 +380,33 @@ export async function selftest(cfg) {
   ok(`最近 24 小时，监听名单里的人 @你 ${msgs.length} 次（这些不会被补处理，只处理之后的新消息）`);
 }
 
+// ---------------------------------------------------------------- 卡片
+
+export async function cards(cfg) {
+  let st = lark.cardCallbackStatus();
+  if (!st.ok) {
+    info('草稿可以用飞书卡片发给你：原文、要点、可直接修改的草稿，加「发送 / 不发」按钮，点一下就发出。');
+    info('这需要给飞书应用开通「卡片回调」（一次性操作，浏览器里确认即可）。');
+    if (!st.url) {
+      warn(`无法自动获取开通链接：${st.message}`);
+      info('可在飞书开发者后台 → 你的应用 → 事件与回调 → 回调配置 中，选择长连接并添加「卡片回传交互」，然后运行 boss-at-me setup --step cards');
+      cfg.reply.cards = false;
+      return;
+    }
+    if (!(await confirm({ message: '现在开通吗？（选否则继续用「发 N」文字指令）', default: true }))) {
+      cfg.reply.cards = false;
+      return;
+    }
+    info(`如果浏览器没自动打开，请手动访问：\n  ${c.cyan(st.url)}`);
+    openUrl(st.url);
+    await confirm({ message: '在浏览器里确认开通后，回到这里按回车继续', default: true });
+    st = lark.cardCallbackStatus();
+  }
+  cfg.reply.cards = st.ok;
+  if (st.ok) ok('卡片回调已开通：草稿会以卡片形式发给你');
+  else warn('卡片回调仍未开通，先继续用「发 N」文字指令；稍后可运行 boss-at-me setup --step cards 重试');
+}
+
 // ---------------------------------------------------------------- 9. 后台服务
 
 export async function service(cfg) {

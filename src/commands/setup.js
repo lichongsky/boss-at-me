@@ -13,6 +13,7 @@ const STEPS = [
   ['sources', '分析来源（项目目录 / 文档）', steps.sources],
   ['reply', '回复设置', steps.reply],
   ['selftest', '自检', steps.selftest],
+  ['cards', '卡片按钮', steps.cards],
   ['service', '后台服务', steps.service],
 ];
 

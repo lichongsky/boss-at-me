@@ -143,3 +143,25 @@ export function replyAsMe(messageId, text) {
 export function botDm(openId, text) {
   return lark(['im', '+messages-send', '--as', 'bot', '--user-id', openId, '--text', text]).data;
 }
+
+export function botCard(openId, card) {
+  return lark(['im', '+messages-send', '--as', 'bot', '--user-id', openId, '--msg-type', 'interactive', '--content', JSON.stringify(card)]).data;
+}
+
+/** 更新机器人发出的卡片（整卡替换） */
+export function updateCard(messageId, card) {
+  return lark(['api', 'PATCH', `/open-apis/im/v1/messages/${messageId}`, '--as', 'bot', '--data', JSON.stringify({ content: JSON.stringify(card) })]);
+}
+
+/** 卡片回调是否已在开发者后台开通；未开通时返回一键开通链接。 */
+export function cardCallbackStatus() {
+  const p = spawnSync(larkBin(), ['event', 'consume', 'card.action.trigger', '--as', 'bot', '--timeout', '1s'], {
+    encoding: 'utf8',
+    env: { ...process.env, ...QUIET_ENV },
+    input: '',
+    timeout: 30_000,
+  });
+  if (p.status === 0) return { ok: true };
+  const err = parseJson(p.stderr)?.error || {};
+  return { ok: false, url: (String(err.hint || '').match(/https:\/\/\S+/) || [])[0] || null, message: err.message || (p.stderr || '').slice(-300) };
+}
