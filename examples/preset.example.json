@@ -1,0 +1,11 @@
+{
+  "provider": {
+    "name": "公司模型网关",
+    "baseUrl": "https://llm-gateway.example.com",
+    "model": ""
+  },
+  "watch": ["张三", "李四"],
+  "signature": "（AI 助手起草，本人已确认）",
+  "intervalSec": 120,
+  "budgetUsd": 2
+}

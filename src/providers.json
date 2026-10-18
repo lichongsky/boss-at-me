@@ -1,0 +1,66 @@
+[
+  {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "baseUrl": "https://api.deepseek.com/anthropic",
+    "model": "deepseek-flash[1m]",
+    "keyUrl": "https://platform.deepseek.com/api_keys",
+    "env": {}
+  },
+  {
+    "id": "kimi",
+    "name": "Kimi（月之暗面，国内）",
+    "baseUrl": "https://api.moonshot.cn/anthropic",
+    "model": "kimi-k3[1m]",
+    "keyUrl": "https://platform.moonshot.cn/console/api-keys",
+    "env": {}
+  },
+  {
+    "id": "glm",
+    "name": "智谱 GLM（国内）",
+    "baseUrl": "https://open.bigmodel.cn/api/anthropic",
+    "model": "glm-5.2[1m]",
+    "keyUrl": "https://open.bigmodel.cn/usercenter/apikeys",
+    "env": { "API_TIMEOUT_MS": "3000000", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1" }
+  },
+  {
+    "id": "zai",
+    "name": "Z.ai（智谱国际）",
+    "baseUrl": "https://api.z.ai/api/anthropic",
+    "model": "glm-5.3[1m]",
+    "keyUrl": "https://z.ai/manage-apikey/apikey-list",
+    "env": { "API_TIMEOUT_MS": "3000000", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1" }
+  },
+  {
+    "id": "qwen",
+    "name": "通义千问（阿里云百炼，按量付费）",
+    "baseUrl": "https://dashscope.aliyuncs.com/apps/anthropic",
+    "model": "qwen3.7-max",
+    "keyUrl": "https://bailian.console.aliyun.com/?tab=model#/api-key",
+    "env": {}
+  },
+  {
+    "id": "qwen-coding",
+    "name": "通义千问（百炼 Coding Plan）",
+    "baseUrl": "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+    "model": "qwen3.7-plus",
+    "keyUrl": "https://bailian.console.aliyun.com/",
+    "env": {}
+  },
+  {
+    "id": "minimax",
+    "name": "MiniMax（国内）",
+    "baseUrl": "https://api.minimax.cn/anthropic",
+    "model": "MiniMax-M3.1-Flash-Preview[1m]",
+    "keyUrl": "https://platform.minimaxi.com/user-center/basic-information/interface-key",
+    "env": {}
+  },
+  {
+    "id": "openrouter",
+    "name": "OpenRouter",
+    "baseUrl": "https://openrouter.ai/api",
+    "model": "~anthropic/claude-sonnet-latest[1m]",
+    "keyUrl": "https://openrouter.ai/keys",
+    "env": {}
+  }
+]

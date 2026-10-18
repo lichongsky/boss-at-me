@@ -1,0 +1,40 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
+
+process.env.BOSS_AT_ME_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'bam-test-'));
+const { parseCommand, resolveCode, isoLocal, parseLarkTime } = await import('../src/lib/poller.js');
+
+test('parseCommand 识别三种指令', () => {
+  assert.deepEqual(parseCommand('发 3'), { kind: 'send', code: '3' });
+  assert.deepEqual(parseCommand(' 发送#12 '), { kind: 'send', code: '12' });
+  assert.deepEqual(parseCommand('发'), { kind: 'send', code: null });
+  assert.deepEqual(parseCommand('send 2'), { kind: 'send', code: '2' });
+  assert.deepEqual(parseCommand('改 4 好的，\n明天给你'), { kind: 'edit', code: '4', text: '好的，\n明天给你' });
+  assert.deepEqual(parseCommand('不发 5'), { kind: 'drop', code: '5' });
+  assert.deepEqual(parseCommand('忽略'), { kind: 'drop', code: null });
+});
+
+test('parseCommand 不误伤普通聊天', () => {
+  for (const s of ['发一下那个文档', '改天再说', '不发了吧我自己回', '好的', '']) assert.equal(parseCommand(s), null);
+});
+
+test('resolveCode：省略编号仅在唯一待确认时生效', () => {
+  const st = { drafts: { 1: { status: 'pending' }, 2: { status: 'sent' } } };
+  assert.deepEqual(resolveCode(st, null), { code: '1' });
+  assert.deepEqual(resolveCode(st, '1'), { code: '1' });
+  assert.ok(resolveCode(st, '2').err);
+  st.drafts[3] = { status: 'pending' };
+  assert.match(resolveCode(st, null).err, /#1、#3/);
+  assert.match(resolveCode({ drafts: {} }, null).err, /没有待确认/);
+});
+
+test('isoLocal 带本地时区偏移，parseLarkTime 按本地时间解析', () => {
+  const d = parseLarkTime('2026-10-17 14:53');
+  assert.equal(d.getHours(), 14);
+  assert.equal(d.getMinutes(), 53);
+  assert.match(isoLocal(d), /^2026-10-17T14:53:00[+-]\d{2}:\d{2}$/);
+  assert.equal(new Date(isoLocal(d)).getTime(), d.getTime());
+});

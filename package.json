@@ -1,0 +1,37 @@
+{
+  "name": "boss-at-me",
+  "version": "0.1.0",
+  "description": "飞书里被领导 @ 时，AI 读代码和聊天记录起草回复，私聊你确认后以你本人身份回复（macOS）",
+  "type": "module",
+  "bin": {
+    "boss-at-me": "bin/boss-at-me.js",
+    "bam": "bin/boss-at-me.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "examples",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.17"
+  },
+  "os": [
+    "darwin"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check-leaks": "node scripts/check-leaks.js"
+  },
+  "keywords": [
+    "feishu",
+    "lark",
+    "claude-code",
+    "agent",
+    "cli"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@inquirer/prompts": "^8.7.3"
+  }
+}
