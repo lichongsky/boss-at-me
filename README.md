@@ -51,6 +51,18 @@ boss-at-me doctor      # 诊断
 boss-at-me uninstall   # 卸载
 ```
 
+## 更新
+
+有新版本时，机器人每天最多私聊提醒一次，`boss-at-me status` 也会显示。更新只需：
+
+```bash
+boss-at-me update          # 更新到最新版；--check 只查看不安装
+```
+
+它会按你的安装方式执行对应的更新命令（GitHub / npm / 源码 git pull）。如果新版本需要补充配置，会列出要重跑的 setup 步骤并引导执行。配置、token、飞书授权都会保留；后台服务下一轮自动使用新代码，不用重启。
+
+检查更新要访问 GitHub。如果你平时通过代理上网，setup 时会记下 shell 里的 `HTTPS_PROXY`，只给检查更新用，飞书和模型请求不走代理。
+
 ## 团队预设
 
 团队内部可以把公共配置写成一个 JSON 文件，安装时带上：
@@ -80,3 +92,11 @@ boss-at-me setup --preset ./team-preset.json   # 也支持 https URL
 npm test
 npm run check-leaks   # 发布前检查打包内容是否含个人/公司信息；私有关键词写进 .leakwords（已 gitignore）
 ```
+
+发版流程：
+
+1. 改 `package.json` 的 `version`；
+2. 在 `src/releases.json` 加一条：`notes` 写给用户看的更新说明，`steps` 列出需要用户重跑的 setup 步骤（没有就留空数组）；
+3. `npm test && npm run check-leaks`，提交，打标签 `vX.Y.Z`，推送到 `main`。
+
+用户端每天读取 `main` 分支上的 `package.json` 和 `src/releases.json` 判断是否有新版本。

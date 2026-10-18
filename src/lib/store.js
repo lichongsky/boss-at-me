@@ -14,6 +14,7 @@ export function defaultConfig() {
     sources: { projects: [], docs: [], feishuDocs: false }, // projects/docs: [{ path, desc }]
     reply: { signature: DEFAULT_SIGNATURE, intervalSec: 120, budgetUsd: 2, effort: 'medium' },
     bins: { node: process.execPath, lark: null, claude: null },
+    network: { proxy: null }, // 仅用于检查新版本
     tuning: { firstRunLookbackMin: 10, searchOverlapMin: 15, contextLookbackHours: 36, draftTtlHours: 48 },
   };
 }

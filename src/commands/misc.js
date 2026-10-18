@@ -7,6 +7,7 @@ import { setLarkBin, authCheck, configShow, whoami } from '../lib/lark.js';
 import { resolveProviderEnv, TOKEN_ACCOUNT } from '../lib/provider.js';
 import { deleteSecret } from '../lib/keychain.js';
 import { runOnce } from '../lib/poller.js';
+import { maybeNotifyUpdate, compareVersions, CURRENT_VERSION } from '../lib/update.js';
 import * as launchd from '../lib/launchd.js';
 import { requiredScopes } from '../setup/steps.js';
 import { c, ok, warn, fail, info } from '../setup/util.js';
@@ -20,7 +21,7 @@ function requireConfig() {
 
 const MAX_LOG = 5 * 1024 * 1024;
 
-export function run(opts) {
+export async function run(opts) {
   const cfg = requireConfig();
   if (!cfg.me || !cfg.watch.length || !cfg.provider) throw new Error('配置不完整，请运行 boss-at-me setup');
   try {
@@ -29,7 +30,11 @@ export function run(opts) {
     // 日志不存在
   }
   runOnce(cfg, { dry: !!opts.dryRun });
-  if (opts.dryRun) log('dry-run 结束，未发送任何消息、未写状态');
+  if (opts.dryRun) {
+    log('dry-run 结束，未发送任何消息、未写状态');
+    return;
+  }
+  await maybeNotifyUpdate(cfg);
 }
 
 export function status() {
@@ -42,6 +47,8 @@ export function status() {
   } catch (e) {
     providerLabel = c.red(e.message);
   }
+  const newer = st.latestVersion && compareVersions(st.latestVersion, CURRENT_VERSION) > 0;
+  console.log(`${c.bold('版本')}      v${CURRENT_VERSION}${newer ? c.yellow(`（有新版本 v${st.latestVersion}，运行 boss-at-me update）`) : ''}`);
   console.log(`${c.bold('用户')}      ${cfg.me?.name ?? '-'}`);
   console.log(`${c.bold('监听')}      ${cfg.watch.map((w) => w.name).join('、') || '-'}`);
   console.log(`${c.bold('模型')}      ${providerLabel}`);

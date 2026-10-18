@@ -1,0 +1,16 @@
+[
+  {
+    "version": "0.1.0",
+    "notes": ["首个版本"],
+    "steps": []
+  },
+  {
+    "version": "0.2.0",
+    "notes": [
+      "新增 boss-at-me update：一条命令更新到最新版，并提示需要重跑的 setup 步骤",
+      "有新版本时，机器人每天最多私聊提醒一次",
+      "boss-at-me status 显示是否有可用更新"
+    ],
+    "steps": []
+  }
+]

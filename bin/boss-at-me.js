@@ -14,6 +14,7 @@ const HELP = `boss-at-me ${version}
   boss-at-me pause | resume             暂停 / 恢复后台服务
   boss-at-me doctor                     诊断常见问题
   boss-at-me run [--dry-run]            手动跑一轮（后台服务调用的就是它）
+  boss-at-me update [--check]           更新到最新版本（--check 只查看不安装）
   boss-at-me uninstall                  卸载
 
 setup 步骤：preflight lark-app lark-auth watch provider sources reply selftest service
@@ -28,7 +29,8 @@ function parseArgs(argv) {
     else if (a === '--preset') opts.preset = rest[++i];
     else if (a === '--dry-run') opts.dryRun = true;
     else if (a === '-f' || a === '--follow') opts.follow = true;
-    else if (a === '--once') opts.once = true;
+    else if (a === '--check') opts.check = true;
+    else if (a === '--from') opts.from = rest[++i];
     else throw new Error(`未知参数：${a}`);
   }
   return { cmd, opts };
@@ -39,6 +41,8 @@ async function main() {
   if (!cmd || cmd === 'help' || cmd === '-h' || cmd === '--help') return console.log(HELP);
   if (cmd === '-v' || cmd === '--version') return console.log(version);
   if (cmd === 'setup') return (await import('../src/commands/setup.js')).default(opts);
+  if (cmd === 'update') return (await import('../src/commands/update.js')).update(opts);
+  if (cmd === 'post-update') return (await import('../src/commands/update.js')).postUpdate(opts);
   const misc = await import('../src/commands/misc.js');
   const fn = { run: misc.run, status: misc.status, logs: misc.logs, pause: misc.pause, resume: misc.resume, doctor: misc.doctor, uninstall: misc.uninstall }[cmd];
   if (!fn) throw new Error(`未知命令：${cmd}\n\n${HELP}`);

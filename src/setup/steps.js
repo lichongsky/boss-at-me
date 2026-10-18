@@ -9,6 +9,7 @@ import { isoLocal } from '../lib/poller.js';
 import * as launchd from '../lib/launchd.js';
 import { loadState, saveState, DEFAULT_SIGNATURE } from '../lib/store.js';
 import { LEGACY_DIR, LOG_PATH } from '../lib/paths.js';
+import { envProxy } from '../lib/update.js';
 import { c, ok, warn, fail, info, which, expandHome, openUrl, firstUrl, guessDescription, runInherit } from './util.js';
 
 export const REQUIRED_SCOPES = [
@@ -34,6 +35,10 @@ export async function preflight(cfg) {
   if (process.platform !== 'darwin') throw new Error('目前只支持 macOS');
   ok(`macOS，Node ${process.version}`);
   cfg.bins.node = process.execPath;
+  // 只用于后台检查新版本（访问 GitHub）；飞书和模型请求不走它
+  const proxy = envProxy();
+  cfg.network = { ...cfg.network, proxy };
+  if (proxy) ok(`检查更新将使用代理：${proxy}`);
 
   let claude = which('claude');
   if (!claude) {
