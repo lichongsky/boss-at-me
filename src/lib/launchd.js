@@ -76,24 +76,36 @@ export function serviceInfo(name = 'agent') {
   };
 }
 
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+// bootout 是异步的：进程还没退干净就 bootstrap 会报 "5: Input/output error"，所以等卸载完成并重试
+function bootout(svc) {
+  if (!isLoaded(svc.label)) return;
+  launchctl(['bootout', `${domain()}/${svc.label}`]);
+  for (let i = 0; i < 50 && isLoaded(svc.label); i++) sleepSync(200);
+}
+
 function bootstrap(svc) {
-  const p = launchctl(['bootstrap', domain(), svc.plist]);
-  if (p.status !== 0) throw new Error(`launchctl bootstrap ${svc.label} 失败：${p.stderr}`);
+  let p;
+  for (let i = 0; i < 5; i++) {
+    p = launchctl(['bootstrap', domain(), svc.plist]);
+    if (p.status === 0 || isLoaded(svc.label)) return;
+    sleepSync(1000);
+  }
+  throw new Error(`launchctl bootstrap ${svc.label} 失败：${p.stderr}`);
 }
 
 export function install(cfg) {
   fs.mkdirSync(LAUNCH_AGENTS_DIR, { recursive: true });
   for (const [name, svc] of Object.entries(SERVICES)) {
-    if (isLoaded(svc.label)) launchctl(['bootout', `${domain()}/${svc.label}`]);
+    bootout(svc);
     fs.writeFileSync(svc.plist, buildPlist(cfg, name));
     bootstrap(svc);
   }
 }
 
 export function pause() {
-  for (const svc of Object.values(SERVICES)) {
-    if (isLoaded(svc.label)) launchctl(['bootout', `${domain()}/${svc.label}`]);
-  }
+  for (const svc of Object.values(SERVICES)) bootout(svc);
 }
 
 export function resume() {
