@@ -7,5 +7,7 @@
   "watch": ["张三", "李四"],
   "signature": "（AI 助手起草，本人已确认）",
   "intervalSec": 120,
-  "budgetUsd": 2
+  "budgetUsd": 2,
+  "monthlyBudgetUsd": 0,
+  "nudgeHours": 12
 }

@@ -283,7 +283,7 @@ export async function provider(cfg, ctx) {
       label += `（${e.message}）`;
     }
     info(`当前供应商：${label}`);
-    if (!(await confirm({ message: '要更换吗？', default: false }))) return testProvider(cfg);
+    if (!(await confirm({ message: '要更换吗？', default: false }))) return await testProvider(cfg);
   }
   for (;;) {
     cfg.provider = await chooseProvider(cfg, ctx);
@@ -295,7 +295,7 @@ export async function provider(cfg, ctx) {
 async function testProvider(cfg) {
   info('正在调用一次模型验证…');
   try {
-    const r = runClaude(cfg, '只回复 ok', {
+    const r = await runClaude(cfg, '只回复 ok', {
       schema: { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
       timeoutMs: 180_000,
     });
@@ -357,6 +357,19 @@ export async function reply(cfg, ctx) {
   cfg.reply.signature = sig.trim().toLowerCase() === 'none' ? '' : `\n${sig.trim()}`;
   cfg.reply.intervalSec = await number({ message: '每隔多少秒检查一次新消息？', default: pre.intervalSec ?? cfg.reply.intervalSec, min: 30, max: 3600 });
   cfg.reply.budgetUsd = await number({ message: '单条消息分析的费用上限（美元）？', default: pre.budgetUsd ?? cfg.reply.budgetUsd, min: 0.1, max: 20, step: 'any' });
+  cfg.reply.monthlyBudgetUsd = await number({
+    message: '每月分析费用上限（美元，0 表示不限）？',
+    default: pre.monthlyBudgetUsd ?? cfg.reply.monthlyBudgetUsd,
+    min: 0,
+    max: 500,
+    step: 'any',
+  });
+  cfg.reply.nudgeHours = await number({
+    message: '有未处理草稿时，每隔几小时主动提醒你一次？（0 表示不提醒）',
+    default: pre.nudgeHours ?? cfg.reply.nudgeHours,
+    min: 0,
+    max: 168,
+  });
 }
 
 // ---------------------------------------------------------------- 8. 自检

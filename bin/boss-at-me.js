@@ -10,6 +10,7 @@ const HELP = `boss-at-me ${version}
 用法：
   boss-at-me setup [--step <步骤>] [--preset <文件|URL>]   交互式初始化（可重复运行）
   boss-at-me status                     查看配置、服务状态和待确认草稿
+  boss-at-me stats                      查看分析次数、估算费用、待确认草稿和忽略原因
   boss-at-me logs [-f]                  查看日志
   boss-at-me pause | resume             暂停 / 恢复后台服务
   boss-at-me doctor                     诊断常见问题
@@ -46,7 +47,7 @@ async function main() {
   if (cmd === 'update') return (await import('../src/commands/update.js')).update(opts);
   if (cmd === 'post-update') return (await import('../src/commands/update.js')).postUpdate(opts);
   const misc = await import('../src/commands/misc.js');
-  const fn = { run: misc.run, status: misc.status, logs: misc.logs, pause: misc.pause, resume: misc.resume, doctor: misc.doctor, uninstall: misc.uninstall }[cmd];
+  const fn = { run: misc.run, status: misc.status, stats: misc.stats, logs: misc.logs, pause: misc.pause, resume: misc.resume, doctor: misc.doctor, uninstall: misc.uninstall }[cmd];
   if (!fn) throw new Error(`未知命令：${cmd}\n\n${HELP}`);
   return fn(opts);
 }

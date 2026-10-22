@@ -12,7 +12,15 @@ export function defaultConfig() {
     watch: [], // [{ open_id, name }]
     provider: null, // 见 provider.js
     sources: { projects: [], docs: [], feishuDocs: false }, // projects/docs: [{ path, desc }]
-    reply: { signature: DEFAULT_SIGNATURE, intervalSec: 120, budgetUsd: 2, effort: 'medium', cards: false },
+    reply: {
+      signature: DEFAULT_SIGNATURE,
+      intervalSec: 120,
+      budgetUsd: 2, // 单条分析的 claude --max-budget-usd 上限
+      monthlyBudgetUsd: 0, // 本月累计估算费用上限；0 表示不限
+      effort: 'medium',
+      cards: false,
+      nudgeHours: 12, // 有未处理草稿时每隔多少小时主动提醒；0 表示不提醒
+    },
     bins: { node: process.execPath, lark: null, claude: null },
     network: { proxy: null }, // 仅用于检查新版本
     p2p: { enabled: false, quietMin: 5 }, // 是否处理监听人的私聊
@@ -70,7 +78,7 @@ export function saveState(st) {
 // ---------------------------------------------------------------- 草稿（跨进程共享）
 
 export function defaultDrafts() {
-  return { drafts: {}, nextCode: 1, dmChatId: null, dmSeen: [] };
+  return { drafts: {}, nextCode: 1, dmChatId: null, dmSeen: [], usage: defaultUsage() };
 }
 
 export function loadDrafts() {
@@ -84,6 +92,68 @@ export function loadDrafts() {
 
 export function saveDrafts(d) {
   writeJsonAtomic(DRAFTS_PATH, d);
+}
+
+// ---------------------------------------------------------------- 使用统计（跨进程共享，跟着草稿锁走）
+
+const pad2 = (n) => String(n).padStart(2, '0');
+export const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+export const monthKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+
+export function defaultUsage() {
+  return {
+    month: monthKey(), monthAnalyses: 0, monthCost: 0, monthDrafts: 0, monthSent: 0, monthDropped: 0, monthExpired: 0,
+    day: dayKey(), dayAnalyses: 0, dayCost: 0,
+    dropReasons: {},
+    failStreak: 0, lastFailAt: null, lastError: null, lastFailAlertAt: null,
+    budgetAlertAt: null, lastNudgeAt: null,
+  };
+}
+
+/** 跨天/跨月时把统计归零；成本来自 claude 返回的 total_cost_usd（按所选供应商的估算）。 */
+export function rollUsage(u) {
+  if (!u || typeof u !== 'object') u = defaultUsage();
+  const now = new Date();
+  if (u.month !== monthKey(now)) {
+    u.month = monthKey(now);
+    u.monthAnalyses = 0;
+    u.monthCost = 0;
+    u.monthDrafts = 0;
+    u.monthSent = 0;
+    u.monthDropped = 0;
+    u.monthExpired = 0;
+    u.budgetAlertAt = null;
+  }
+  if (u.day !== dayKey(now)) {
+    u.day = dayKey(now);
+    u.dayAnalyses = 0;
+    u.dayCost = 0;
+  }
+  if (!u.dropReasons) u.dropReasons = {};
+  return u;
+}
+
+/** 在已持有草稿锁的上下文中累加统计（数字字段是加上去，其余字段是覆盖）。 */
+export function bumpUsage(d, patch = {}) {
+  d.usage = rollUsage(d.usage);
+  for (const [k, v] of Object.entries(patch)) {
+    if (typeof v === 'number' && typeof d.usage[k] === 'number') d.usage[k] += v;
+    else d.usage[k] = v;
+  }
+  return d.usage;
+}
+
+/** 在草稿锁内读-改-写 usage，返回 fn 的返回值。 */
+export function recordUsage(fn) {
+  return withDrafts((d) => {
+    d.usage = rollUsage(d.usage);
+    return fn(d.usage, d);
+  });
+}
+
+/** 只读取一份快照（会顺带做跨天/跨月归零并落盘）。 */
+export function readUsage() {
+  return withDrafts((d) => ({ ...rollUsage(d.usage) }));
 }
 
 function tryLock(p) {

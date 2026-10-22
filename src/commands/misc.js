@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { confirm } from '@inquirer/prompts';
-import { loadConfig, loadState, loadDrafts, configExists, log } from '../lib/store.js';
+import { loadConfig, loadState, loadDrafts, readUsage, configExists, log } from '../lib/store.js';
 import { HOME, LOG_PATH, PLIST_PATH } from '../lib/paths.js';
 import { setLarkBin, authCheck, configShow, whoami } from '../lib/lark.js';
 import { resolveProviderEnv, TOKEN_ACCOUNT } from '../lib/provider.js';
@@ -29,7 +29,7 @@ export async function run(opts) {
   } catch {
     // 日志不存在
   }
-  runOnce(cfg, { dry: !!opts.dryRun });
+  await runOnce(cfg, { dry: !!opts.dryRun });
   if (opts.dryRun) {
     log('dry-run 结束，未发送任何消息、未写状态');
     return;
@@ -58,9 +58,30 @@ export function status() {
   const lis = launchd.serviceInfo('listener');
   console.log(`${c.bold('实时确认')}  ${lis.pid ? c.green(`监听中（pid ${lis.pid}）`) : lis.loaded ? c.yellow('重启中') : c.yellow('未运行，确认指令最多延迟一个检查周期（boss-at-me setup --step service 安装）')}`);
   console.log(`${c.bold('上次检查')}  ${st.lastSearchEnd ? new Date(st.lastSearchEnd).toLocaleString('sv-SE') : '-'}`);
+  const u = readUsage();
+  console.log(`${c.bold('用量')}      ${u.day} 分析 ${u.dayAnalyses} 次 · 估算 $${Number(u.dayCost || 0).toFixed(2)}；本月 ${u.monthAnalyses} 次 · $${Number(u.monthCost || 0).toFixed(2)}`);
   const pending = Object.entries(loadDrafts().drafts).filter(([, d]) => d.status === 'pending');
   console.log(`${c.bold('待确认')}    ${pending.length ? '' : '无'}`);
   for (const [code, d] of pending) console.log(`  #${code} ${d.sender} @你 · ${d.chatName} · ${(d.draft || '（无草稿）').replace(/\s+/g, ' ').slice(0, 40)}`);
+}
+
+export function stats() {
+  const u = readUsage();
+  const d = loadDrafts();
+  const pending = Object.entries(d.drafts)
+    .filter(([, x]) => x.status === 'pending')
+    .sort((a, b) => new Date(a[1].created) - new Date(b[1].created));
+  const reasons = Object.entries(u.dropReasons || {}).sort((a, b) => b[1] - a[1]);
+  console.log(`${c.bold('今日')}    ${u.day}  分析 ${u.dayAnalyses} 次 · 估算 $${Number(u.dayCost || 0).toFixed(2)}`);
+  console.log(`${c.bold('本月')}    ${u.month}  分析 ${u.monthAnalyses} 次 · 草稿 ${u.monthDrafts} 条 · 已发 ${u.monthSent} · 忽略 ${u.monthDropped} · 过期 ${u.monthExpired} · 估算 $${Number(u.monthCost || 0).toFixed(2)}`);
+  console.log(`${c.bold('待确认')}  ${pending.length ? '' : '无'}${pending.length ? `${pending.length} 条` : ''}`);
+  for (const [code, x] of pending) {
+    const age = ((Date.now() - new Date(x.created)) / 3600_000).toFixed(1);
+    console.log(`  #${code} ${x.sender} ${x.kind === 'p2p' ? '私聊' : `@你 · ${x.chatName}`} · ${age}h · ${x.action === 'notify' ? '需你处理' : '有草稿'}`);
+  }
+  if (reasons.length) console.log(`${c.bold('忽略原因')}  ${reasons.map(([k, v]) => `${k} ${v}`).join(' · ')}`);
+  console.log(`${c.bold('失败')}    连续 ${u.failStreak || 0} 次${u.lastError ? ` · 最近：${u.lastError}` : ''}`);
+  console.log(c.dim('费用为 claude 按所选供应商价目估算的 total_cost_usd，实际账单可能不同；用 config 的 reply.monthlyBudgetUsd 可设月度上限。'));
 }
 
 export function logs(opts) {
@@ -116,6 +137,9 @@ export function doctor() {
     const tail = fs.readFileSync(LOG_PATH, 'utf8').trim().split('\n').slice(-5);
     info(`最近日志：\n${tail.map((l) => `    ${l}`).join('\n')}`);
   }
+  const u = readUsage();
+  info(`用量：本月分析 ${u.monthAnalyses} 次、估算 $${Number(u.monthCost || 0).toFixed(2)}；连续失败 ${u.failStreak || 0} 次`);
+  if (u.lastError) warn(`最近一次分析错误：${u.lastError}（${u.lastFailAt ? new Date(u.lastFailAt).toLocaleString('sv-SE') : '-'}）`);
   console.log(bad ? c.yellow(`\n发现 ${bad} 个问题`) : c.green('\n一切正常'));
   info(c.dim('模型是否真的可用，可以运行 boss-at-me setup --step provider 实测一次（会产生一次调用费用）'));
 }
