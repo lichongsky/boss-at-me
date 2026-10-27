@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG_PATH, STATE_PATH, HOME, LOG_PATH, DRAFTS_PATH, DRAFTS_LOCK_PATH } from './paths.js';
 
-export const DEFAULT_SIGNATURE = '\n（AI 助手起草，本人已确认）';
+export const DEFAULT_SIGNATURE = '';
 
 export function defaultConfig() {
   return {

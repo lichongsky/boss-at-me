@@ -351,10 +351,11 @@ export async function sources(cfg, ctx) {
 export async function reply(cfg, ctx) {
   const pre = ctx.preset || {};
   const sig = await input({
-    message: '确认发送的草稿末尾加什么标识？（输入 none 表示不加）',
+    message: '确认发送的草稿末尾加什么标识？（默认不加；输入 none 也不加）',
     default: (pre.signature ?? cfg.reply.signature ?? DEFAULT_SIGNATURE).trim(),
   });
-  cfg.reply.signature = sig.trim().toLowerCase() === 'none' ? '' : `\n${sig.trim()}`;
+  const trimmed = sig.trim();
+  cfg.reply.signature = !trimmed || trimmed.toLowerCase() === 'none' ? '' : `\n${trimmed}`;
   cfg.reply.intervalSec = await number({ message: '每隔多少秒检查一次新消息？', default: pre.intervalSec ?? cfg.reply.intervalSec, min: 30, max: 3600 });
   cfg.reply.budgetUsd = await number({ message: '单条消息分析的费用上限（美元）？', default: pre.budgetUsd ?? cfg.reply.budgetUsd, min: 0.1, max: 20, step: 'any' });
   cfg.reply.monthlyBudgetUsd = await number({

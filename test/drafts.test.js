@@ -124,6 +124,17 @@ test('executeDraft：快捷选项按 text 发送并带署名；重发 manual 草
   assert.equal(d.usage.monthDropped, 1);
 });
 
+test('executeDraft：没有署名时原样发送，不加任何后缀', () => {
+  const cfg = { me: { open_id: 'ou_me' }, reply: { signature: '' } };
+  const d = {
+    drafts: { 1: { status: 'pending', draft: '好的', messageId: 'om_1' } },
+    usage: store.defaultUsage(),
+  };
+  assert.equal(executeDraft(cfg, d, '1', { kind: 'send' }, { dry: true }).final, '好的');
+  assert.equal(executeDraft(cfg, d, '1', { kind: 'send', text: '今天给' }, { dry: true }).final, '今天给');
+  assert.equal(store.defaultConfig().reply.signature, '');
+});
+
 test('buildPendingDigest 列出编号、来源和年龄', () => {
   const now = new Date('2026-10-21T12:00:00+08:00').getTime();
   const text = buildPendingDigest([

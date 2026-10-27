@@ -35,7 +35,7 @@ boss-at-me setup
 | watch | 添加 / 删除要监听的人（从通讯录里选），以及是否处理他们的私聊 |
 | provider | 选模型供应商：跟随 CC Switch、Anthropic 官方、DeepSeek、Kimi、智谱 GLM、通义千问、MiniMax、OpenRouter 或自定义网关。token 存在 macOS 钥匙串 |
 | sources | 粘贴项目代码目录、本地文档目录，并选择是否允许读飞书文档链接 |
-| reply | 草稿署名、检查间隔、单条/每月费用上限、未处理草稿提醒间隔 |
+| reply | 草稿署名（默认不加）、检查间隔、单条/每月费用上限、未处理草稿提醒间隔 |
 | selftest | 机器人给你发一条测试私聊 |
 | cards | 开通卡片回调：草稿以卡片发到私聊，可直接改、点按钮发送（不装也能用「发 N」文字指令） |
 | service | 安装 launchd 后台服务，开机自动运行 |
@@ -46,7 +46,7 @@ boss-at-me setup
 
 在机器人私聊里回复：
 
-- `发 3`：原样发送 3 号草稿（末尾带署名）
+- `发 3`：原样发送 3 号草稿（默认不加任何后缀）
 - `改 3 你的内容`：发你改过的内容
 - `不发 3`：忽略
 
@@ -92,7 +92,7 @@ boss-at-me update          # 更新到最新版；--check 只查看不安装
 boss-at-me setup --preset ./team-preset.json   # 也支持 https URL
 ```
 
-格式见 [examples/preset.example.json](examples/preset.example.json)：可预填模型网关地址、默认监听的人、署名、检查间隔。预设里不要放 token，token 仍由每个人自己粘贴进钥匙串。
+格式见 [examples/preset.example.json](examples/preset.example.json)：可预填模型网关地址、默认监听的人、可选署名、检查间隔。预设里不要放 token，token 仍由每个人自己粘贴进钥匙串。
 
 ## 数据放在哪
 
