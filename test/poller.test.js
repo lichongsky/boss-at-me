@@ -62,7 +62,7 @@ test('isoLocal 带本地时区偏移，parseLarkTime 按本地时间解析', () 
   assert.equal(new Date(isoLocal(d)).getTime(), d.getTime());
 });
 
-const { planP2p, unansweredTail, repliedAfter } = await import('../src/lib/poller.js');
+const { planP2p, unansweredTail, repliedAfter, ackOnly } = await import('../src/lib/poller.js');
 const pm = (id, chat, t, sender = 'ou_boss') => ({ message_id: id, chat_id: chat, create_time: t, sender: { id: sender } });
 
 test('planP2p：按会话合并，对方最后一条未满静默时间的先等待', () => {
@@ -76,6 +76,15 @@ test('planP2p：按会话合并，对方最后一条未满静默时间的先等�
   assert.deepEqual(ready[0].batch.map((m) => m.message_id), ['a1', 'a2']);
   assert.equal(ready[0].target.message_id, 'a2');
   assert.equal(ready[0].kind, 'p2p');
+});
+
+test('ackOnly：纯确认/附和消息在分析前就跳过', () => {
+  for (const s of ['是的', '@李冲 是的', '好的！', '收到', '嗯嗯', '👍', '谢谢', 'OK']) {
+    assert.equal(ackOnly(s), true, s);
+  }
+  for (const s of ['是的，就按你说的做', '好的，明天上线', '收到，麻烦周四给', '这个来鸟是推荐视频吗', '', '@李冲']) {
+    assert.equal(ackOnly(s), false, s);
+  }
 });
 
 test('repliedAfter：目标消息之后我发过言就算已回复', () => {

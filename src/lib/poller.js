@@ -366,6 +366,22 @@ export function planP2p(msgs, now, quietMin) {
  * 私聊里我最后一次发言之后、对方还没被回复的那几条（按会话顺序判断，不依赖分钟级时间戳）。
  * 例如对方 16:44 发两条、我 16:45 回了、对方 16:54 又发两条，只留下 16:54 的两条；全部回过则返回空数组。
  */
+const ACK_WORDS = new Set([
+  '是的', '是', '是的呀', '对的', '对', '对啊', '嗯', '嗯嗯', '嗯呢', '好', '好的', '好滴', '好嘞', '好呀', '好吧',
+  '收到', '收到啦', '收到收到', '可以', '行', 'ok', 'okay', '没问题', '没错', '确实', '了解', '明白', '知道了',
+  '辛苦了', '谢谢', '感谢', '👍', '👌', '🆗', '✅',
+]);
+
+/** 去掉 @ 和标点后，整条消息是不是只是「是的/好的/收到/嗯/谢谢」这类确认或附和。 */
+export function ackOnly(content) {
+  const text = String(content || '')
+    .replace(/@\S+/g, ' ')
+    .replace(/[，。！？、,.!?~～…\s]+/g, '')
+    .trim()
+    .toLowerCase();
+  return !!text && ACK_WORDS.has(text);
+}
+
 /** 目标消息之后我有没有发过言（按会话顺序判断，同一分钟也准；目标不在本页时按时间兜底）。 */
 export function repliedAfter(msgs, target, myId) {
   const index = msgs.findIndex((x) => x.message_id === target.message_id);
@@ -452,6 +468,10 @@ async function processJob(cfg, job) {
       start: isoLocal(new Date(t - cfg.tuning.contextLookbackHours * HOUR)),
       end: isoLocal(new Date()),
     });
+    if (ackOnly(batchText(job))) {
+      log('skip ack-only message', m.message_id);
+      return;
+    }
     if (job.kind === 'p2p') {
       const tail = unansweredTail(ctx, job, cfg.me.open_id);
       if (!tail.length) {
